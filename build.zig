@@ -2,7 +2,7 @@ const std = @import("std");
 const generate = @import("generate.zig");
 
 pub fn build(b: *std.Build) !void {
-    const raylibSrc = "raylib/src/";
+    const raylibSrc = "./raylib/src/";
 
     const target = b.standardTargetOptions(.{});
 
