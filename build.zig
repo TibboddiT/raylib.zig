@@ -72,6 +72,16 @@ pub fn build(b: *std.Build) !void {
     const raylib_parser_install = b.step("raylib_parser", "build ./zig-out/bin/raylib_parser.exe");
     const generateBindings_install = b.addInstallArtifact(raylib_parser_build, .{});
     raylib_parser_install.dependOn(&generateBindings_install.step);
+
+    const lib = b.addStaticLibrary(.{ .name = "raylib-zig", .target = target, .optimize = optimize });
+    lib.addIncludePath(.{ .path = dir_raylib });
+    lib.addIncludePath(.{ .path = cwd });
+    lib.linkLibC();
+    lib.addCSourceFile(.{ .file = .{ .path = cwd ++ sep ++ "marshal.c" }, .flags = &.{} });
+
+    b.installArtifact(lib);
+
+    b.addModule("raylib", .{ .source_file = .{ .path = cwd ++ sep ++ "raylib.zig" } });
 }
 
 // above: generate library
