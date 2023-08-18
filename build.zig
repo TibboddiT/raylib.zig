@@ -87,6 +87,9 @@ pub fn build(b: *std.Build) !void {
     };
 
     _ = b.addModule("raylib", .{ .source_file = .{ .path = cwd ++ sep ++ "raylib.zig" } });
+
+    const lib_raylib = raylib_build.addRaylib(b, target, optimize, .{});
+    b.installArtifact(lib_raylib);
 }
 
 // above: generate library
