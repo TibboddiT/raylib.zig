@@ -88,8 +88,10 @@ pub fn build(b: *std.Build) !void {
 
     _ = b.addModule("raylib", .{ .source_file = .{ .path = cwd ++ sep ++ "raylib.zig" } });
 
+    const raylib_build = @import("./raylib/src/build.zig");
+
     const lib_raylib = raylib_build.addRaylib(b, target, optimize, .{});
-    lib_raylib.step.dependOn(lib.step);
+    lib_raylib.step.dependOn(&lib.step);
     b.installArtifact(lib_raylib);
 }
 
@@ -105,8 +107,6 @@ const sep = std.fs.path.sep_str;
 const dir_raylib = cwd ++ sep ++ "raylib";
 const dir_raylib_src = cwd ++ sep ++ "raylib/src";
 
-const raylib_build = @import("./raylib/build.zig");
-
 fn linkThisLibrary(b: *std.Build, target: std.zig.CrossTarget, optimize: std.builtin.Mode) *std.build.LibExeObjStep {
     const lib = b.addStaticLibrary(.{ .name = "raylib-zig", .target = target, .optimize = optimize });
     lib.addIncludePath(.{ .path = dir_raylib_src });
@@ -118,6 +118,8 @@ fn linkThisLibrary(b: *std.Build, target: std.zig.CrossTarget, optimize: std.bui
 
 /// add this package to exe
 pub fn addTo(b: *std.Build, exe: *std.build.LibExeObjStep, target: std.zig.CrossTarget, optimize: std.builtin.Mode) void {
+    const raylib_build = @import("./raylib/src/build.zig");
+
     exe.addAnonymousModule("raylib", .{ .source_file = .{ .path = cwd ++ sep ++ "raylib.zig" } });
     exe.addIncludePath(.{ .path = dir_raylib_src });
     exe.addIncludePath(.{ .path = cwd });
