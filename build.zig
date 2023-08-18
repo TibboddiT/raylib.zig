@@ -74,12 +74,17 @@ pub fn build(b: *std.Build) !void {
     raylib_parser_install.dependOn(&generateBindings_install.step);
 
     const lib = b.addStaticLibrary(.{ .name = "raylib-zig", .target = target, .optimize = optimize });
-    lib.addIncludePath(.{ .path = dir_raylib });
+    lib.addIncludePath(.{ .path = dir_raylib_src });
     lib.addIncludePath(.{ .path = cwd });
     lib.linkLibC();
     lib.addCSourceFile(.{ .file = .{ .path = cwd ++ sep ++ "marshal.c" }, .flags = &.{} });
-
     b.installArtifact(lib);
+
+    _ = std.fs.cwd().openDir(dir_raylib_src, .{}) catch |git_err| {
+        std.debug.print("Warning: {!}. The raylib library will be grabbed!\n", .{git_err});
+        const raylib_fetch = b.addSystemCommand(&[_][]const u8{ "git", "clone", "https://github.com/raysan5/raylib", dir_raylib, "--depth=1" });
+        lib.step.dependOn(&raylib_fetch.step);
+    };
 
     _ = b.addModule("raylib", .{ .source_file = .{ .path = cwd ++ sep ++ "raylib.zig" } });
 }
@@ -93,13 +98,14 @@ fn current_file() []const u8 {
 
 const cwd = std.fs.path.dirname(current_file()).?;
 const sep = std.fs.path.sep_str;
-const dir_raylib = cwd ++ sep ++ "raylib/src";
+const dir_raylib = cwd ++ sep ++ "raylib";
+const dir_raylib_src = cwd ++ sep ++ "raylib/src";
 
 const raylib_build = @import("./build.zig");
 
 fn linkThisLibrary(b: *std.Build, target: std.zig.CrossTarget, optimize: std.builtin.Mode) *std.build.LibExeObjStep {
     const lib = b.addStaticLibrary(.{ .name = "raylib-zig", .target = target, .optimize = optimize });
-    lib.addIncludePath(.{ .path = dir_raylib });
+    lib.addIncludePath(.{ .path = dir_raylib_src });
     lib.addIncludePath(.{ .path = cwd });
     lib.linkLibC();
     lib.addCSourceFile(.{ .file = .{ .path = cwd ++ sep ++ "marshal.c" }, .flags = &.{} });
@@ -109,7 +115,7 @@ fn linkThisLibrary(b: *std.Build, target: std.zig.CrossTarget, optimize: std.bui
 /// add this package to exe
 pub fn addTo(b: *std.Build, exe: *std.build.LibExeObjStep, target: std.zig.CrossTarget, optimize: std.builtin.Mode) void {
     exe.addAnonymousModule("raylib", .{ .source_file = .{ .path = cwd ++ sep ++ "raylib.zig" } });
-    exe.addIncludePath(.{ .path = dir_raylib });
+    exe.addIncludePath(.{ .path = dir_raylib_src });
     exe.addIncludePath(.{ .path = cwd });
     const lib = linkThisLibrary(b, target, optimize);
     const lib_raylib = raylib_build.addRaylib(b, target, optimize, .{});
