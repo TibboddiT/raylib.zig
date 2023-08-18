@@ -5,6 +5,7 @@ pub fn build(b: *std.Build) !void {
     const raylibSrc = "./raylib/src/";
 
     const target = b.standardTargetOptions(.{});
+    const optimize = b.standardOptimizeOption(.{});
 
     //--- parse raylib and generate JSONs for all signatures --------------------------------------
     const jsons = b.step("parse", "parse raylib headers and generate raylib jsons");
@@ -12,7 +13,7 @@ pub fn build(b: *std.Build) !void {
         .name = "raylib_parser",
         .root_source_file = std.build.FileSource.relative("raylib_parser.zig"),
         .target = target,
-        .optimize = .ReleaseFast,
+        .optimize = optimize,
     });
     raylib_parser_build.addCSourceFile(.{ .file = .{ .path = "raylib/parser/raylib_parser.c" }, .flags = &.{} });
     raylib_parser_build.linkLibC();
