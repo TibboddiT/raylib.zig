@@ -2,26 +2,37 @@ const std = @import("std");
 const generate = @import("generate.zig");
 
 pub fn build(b: *std.Build) !void {
-    const raylibSrc = "./raylib/src/";
-
     const target = b.standardTargetOptions(.{});
     const optimize = b.standardOptimizeOption(.{});
 
+    const raylib_dep = b.dependency("raylib", .{
+        .target = target,
+        .optimize = optimize,
+    });
+
+    const lib_raylib = raylib_dep.artifact("raylib");
+
+    var baseBuf: [2048]u8 = undefined;
+    const raylib_base_dir = std.fmt.bufPrint(&baseBuf, "{s}/{s}", .{ lib_raylib.include_dirs.items[0].path.path, "../../../.." }) catch unreachable;
+
+    var printBuf: [2048]u8 = undefined;
+
     //--- parse raylib and generate JSONs for all signatures --------------------------------------
     const jsons = b.step("parse", "parse raylib headers and generate raylib jsons");
+
     const raylib_parser_build = b.addExecutable(.{
         .name = "raylib_parser",
         .root_source_file = std.build.FileSource.relative("raylib_parser.zig"),
         .target = target,
-        .optimize = optimize,
+        .optimize = .ReleaseFast,
     });
-    raylib_parser_build.addCSourceFile(.{ .file = .{ .path = "raylib/parser/raylib_parser.c" }, .flags = &.{} });
+    raylib_parser_build.addCSourceFile(.{ .file = .{ .path = std.fmt.bufPrint(&printBuf, "{s}/{s}", .{ raylib_base_dir, "parser/raylib_parser.c" }) catch unreachable }, .flags = &.{} });
     raylib_parser_build.linkLibC();
 
     //raylib
     const raylib_H = b.addRunArtifact(raylib_parser_build);
     raylib_H.addArgs(&.{
-        "-i", raylibSrc ++ "raylib.h",
+        "-i", std.fmt.bufPrint(&printBuf, "{s}/{s}", .{ raylib_base_dir, "src/raylib.h" }) catch unreachable,
         "-o", "raylib.json",
         "-f", "JSON",
         "-d", "RLAPI",
@@ -31,7 +42,7 @@ pub fn build(b: *std.Build) !void {
     //raymath
     const raymath_H = b.addRunArtifact(raylib_parser_build);
     raymath_H.addArgs(&.{
-        "-i", raylibSrc ++ "raymath.h",
+        "-i", std.fmt.bufPrint(&printBuf, "{s}/{s}", .{ raylib_base_dir, "src/raymath.h" }) catch unreachable,
         "-o", "raymath.json",
         "-f", "JSON",
         "-d", "RMAPI",
@@ -41,7 +52,7 @@ pub fn build(b: *std.Build) !void {
     //rlgl
     const rlgl_H = b.addRunArtifact(raylib_parser_build);
     rlgl_H.addArgs(&.{
-        "-i", raylibSrc ++ "rlgl.h",
+        "-i", std.fmt.bufPrint(&printBuf, "{s}/{s}", .{ raylib_base_dir, "src/rlgl.h" }) catch unreachable,
         "-o", "rlgl.json",
         "-f", "JSON",
         "-d", "RLAPI",
@@ -74,57 +85,46 @@ pub fn build(b: *std.Build) !void {
     raylib_parser_install.dependOn(&generateBindings_install.step);
 
     const lib = b.addStaticLibrary(.{ .name = "raylib-zig", .target = target, .optimize = optimize });
-    lib.addIncludePath(.{ .path = dir_raylib_src });
-    lib.addIncludePath(.{ .path = cwd });
+    for (lib_raylib.include_dirs.items) |item| lib.addIncludePath(item.path);
+    for (lib_raylib.lib_paths.items) |item| lib.addLibraryPath(item);
     lib.linkLibC();
-    lib.addCSourceFile(.{ .file = .{ .path = cwd ++ sep ++ "marshal.c" }, .flags = &.{} });
+    lib.linkLibrary(lib_raylib);
+    lib.addCSourceFile(.{ .file = .{ .path = "./marshal.c" }, .flags = &.{} });
     b.installArtifact(lib);
 
-    _ = std.fs.cwd().openDir(dir_raylib_src, .{}) catch |git_err| {
-        std.debug.print("Warning: {!}. The raylib library will be grabbed!\n", .{git_err});
-        const raylib_fetch = b.addSystemCommand(&[_][]const u8{ "git", "clone", "https://github.com/raysan5/raylib", dir_raylib, "--depth=1" });
-        lib.step.dependOn(&raylib_fetch.step);
-    };
-
-    _ = b.addModule("raylib", .{ .source_file = .{ .path = cwd ++ sep ++ "raylib.zig" } });
-
-    const raylib_build = @import("./raylib/src/build.zig");
-
-    const lib_raylib = raylib_build.addRaylib(b, target, optimize, .{});
-    lib_raylib.step.dependOn(&lib.step);
-    b.installArtifact(lib_raylib);
+    _ = b.addModule("raylib", .{ .source_file = .{ .path = "./raylib.zig" } });
 }
 
-// above: generate library
-// below: linking (use as dependency)
+// // above: generate library
+// // below: linking (use as dependency)
 
-fn current_file() []const u8 {
-    return @src().file;
-}
+// fn current_file() []const u8 {
+//     return @src().file;
+// }
 
-const cwd = std.fs.path.dirname(current_file()).?;
-const sep = std.fs.path.sep_str;
-const dir_raylib = cwd ++ sep ++ "raylib";
-const dir_raylib_src = cwd ++ sep ++ "raylib/src";
+// const cwd = std.fs.path.dirname(current_file()).?;
+// const sep = std.fs.path.sep_str;
+// const dir_raylib = cwd ++ sep ++ "raylib";
+// const dir_raylib_src = cwd ++ sep ++ "raylib/src";
 
-fn linkThisLibrary(b: *std.Build, target: std.zig.CrossTarget, optimize: std.builtin.Mode) *std.build.LibExeObjStep {
-    const lib = b.addStaticLibrary(.{ .name = "raylib-zig", .target = target, .optimize = optimize });
-    lib.addIncludePath(.{ .path = dir_raylib_src });
-    lib.addIncludePath(.{ .path = cwd });
-    lib.linkLibC();
-    lib.addCSourceFile(.{ .file = .{ .path = cwd ++ sep ++ "marshal.c" }, .flags = &.{} });
-    return lib;
-}
+// fn linkThisLibrary(b: *std.Build, target: std.zig.CrossTarget, optimize: std.builtin.Mode) *std.build.LibExeObjStep {
+//     const lib = b.addStaticLibrary(.{ .name = "raylib-zig", .target = target, .optimize = optimize });
+//     lib.addIncludePath(.{ .path = dir_raylib_src });
+//     lib.addIncludePath(.{ .path = cwd });
+//     lib.linkLibC();
+//     lib.addCSourceFile(.{ .file = .{ .path = cwd ++ sep ++ "marshal.c" }, .flags = &.{} });
+//     return lib;
+// }
 
-/// add this package to exe
-pub fn addTo(b: *std.Build, exe: *std.build.LibExeObjStep, target: std.zig.CrossTarget, optimize: std.builtin.Mode) void {
-    const raylib_build = @import("./raylib/src/build.zig");
+// /// add this package to exe
+// pub fn addTo(b: *std.Build, exe: *std.build.LibExeObjStep, target: std.zig.CrossTarget, optimize: std.builtin.Mode) void {
+//     const raylib_build = @import("./raylib/src/build.zig");
 
-    exe.addAnonymousModule("raylib", .{ .source_file = .{ .path = cwd ++ sep ++ "raylib.zig" } });
-    exe.addIncludePath(.{ .path = dir_raylib_src });
-    exe.addIncludePath(.{ .path = cwd });
-    const lib = linkThisLibrary(b, target, optimize);
-    const lib_raylib = raylib_build.addRaylib(b, target, optimize, .{});
-    exe.linkLibrary(lib_raylib);
-    exe.linkLibrary(lib);
-}
+//     exe.addAnonymousModule("raylib", .{ .source_file = .{ .path = cwd ++ sep ++ "raylib.zig" } });
+//     exe.addIncludePath(.{ .path = dir_raylib_src });
+//     exe.addIncludePath(.{ .path = cwd });
+//     const lib = linkThisLibrary(b, target, optimize);
+//     const lib_raylib = raylib_build.addRaylib(b, target, optimize, .{});
+//     exe.linkLibrary(lib_raylib);
+//     exe.linkLibrary(lib);
+// }
