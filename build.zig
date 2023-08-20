@@ -85,6 +85,7 @@ pub fn build(b: *std.Build) !void {
     raylib_parser_install.dependOn(&generateBindings_install.step);
 
     const lib = b.addStaticLibrary(.{ .name = "raylib-zig", .target = target, .optimize = optimize });
+    lib.addIncludePath(.{ .path = std.fs.path.dirname(@src().file).? });
     for (lib_raylib.include_dirs.items) |item| lib.addIncludePath(item.path);
     for (lib_raylib.lib_paths.items) |item| lib.addLibraryPath(item);
     lib.linkLibC();
