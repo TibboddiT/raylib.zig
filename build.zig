@@ -91,6 +91,7 @@ pub fn build(b: *std.Build) !void {
     lib.linkLibrary(lib_raylib);
     lib.addCSourceFile(.{ .file = .{ .path = "./marshal.c" }, .flags = &.{} });
     b.installArtifact(lib);
+    b.installArtifact(lib_raylib);
 
     _ = b.addModule("raylib", .{ .source_file = .{ .path = "./raylib.zig" } });
 }
